@@ -10,6 +10,7 @@
 
 const Blob = require('./Blob');
 const EventTarget = require('event-target-shim');
+const {toByteArray} = require('base64-js')
 
 import NativeFileReaderModule from './NativeFileReaderModule';
 
@@ -79,9 +80,36 @@ class FileReader extends (EventTarget(...READER_EVENTS): any) {
     }
   }
 
-  readAsArrayBuffer() {
-    throw new Error('FileReader.readAsArrayBuffer is not implemented');
-  }
+  readAsArrayBuffer(blob: ?Blob) {
+     this._aborted = false;
+ 
+     if (blob == null) {
+       throw new TypeError(
+         "Failed to execute 'readAsArrayBuffer' on 'FileReader': parameter 1 is not of type 'Blob'",
+       );
+     }
+ 
+     NativeFileReaderModule.readAsDataURL(blob.data).then(
+       (text: string) => {
+         if (this._aborted) {
+           return;
+         }
+ 
+         const base64 = text.split(',')[1];
+         const typedArray = toByteArray(base64);
+ 
+         this._result = typedArray.buffer;
+         this._setReadyState(DONE);
+       },
+       error => {
+         if (this._aborted) {
+           return;
+         }
+         this._error = error;
+         this._setReadyState(DONE);
+       },
+     );
+   }
 
   readAsDataURL(blob: ?Blob) {
     this._aborted = false;
